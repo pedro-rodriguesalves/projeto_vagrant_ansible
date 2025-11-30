@@ -1,0 +1,117 @@
+---
+- name: Configuração Geral de Todas as Máquinas.
+  hosts: all
+  become: yes
+  vars:
+    nome1: "pedro"
+    nome2: "felipe"
+
+    grupo: "ifpb"
+    usuarios:
+      - "pedro"
+      - "felipe"
+
+    ntp_servers:
+      - "pool.ntp.br"
+
+    ssh_banner: "Acesso apenas para pessoas com autorização expressa!!!"
+  
+  tasks: 
+    - name: Atualizar o Sistema Operacional.
+      apt:
+        update_cache: yes
+        cache_valid_time: 3600
+
+    - name: Fazer o Upgrade do Sistema Operacional.
+      apt:
+        upgrade: dist
+        autoremove: yes
+
+    - name: Instalação do chrony.
+      apt:
+        name: chrony
+        state: present
+
+    - name: Configurar o servidor NTP.
+      template:
+        src: templates/chrony.conf.j2
+        dest: /etc/chrony/chrony.conf
+      notify: restart chrony
+
+    - name: Rodar o chrony.
+      systemd:
+        name: chrony
+        state: started
+        enabled: yes
+  
+
+    - name: Configurar timezone America/Recife.
+      timezone:
+        name: America/Recife
+
+    
+    - name: Criar grupo ifpb.
+      group:
+        name: "{{ grupo }}"
+        state: present
+
+    
+    - name: Criar usuários no grupo ifpb.
+      user:
+        name: "{{ item }}"
+        group: "{{ grupo }}"
+        shell: /bin/bash
+        state: present
+        create_home: yes
+      loop: "{{ usuarios }}"
+
+    
+    - name: Gerar chaves SSH para os usuários.
+      user:
+        name: "{{ item }}"
+        generate_ssh_key: yes
+        ssh_key_file: .ssh/id_rsa
+      loop: "{{ usuarios }}"
+
+    
+    - name: Configurar servidor SSH.
+      template:
+        src: templates/sshd_config.j2
+        dest: /etc/ssh/sshd_config
+      notify: restart ssh
+
+    - name: Criar banner do SSH.
+      copy:
+        content: "{{ ssh_banner }}"
+        dest: /etc/ssh/banner
+        owner: root
+        group: root
+        mode: 0644
+
+    
+    - name: Instalar cliente NFS.
+      apt:
+        name: nfs-common
+        state: present
+
+    
+    - name: Permitir grupo ifpb usar sudo.
+      lineinfile:
+        path: /etc/sudoers
+        state: present
+        line: "%{{ grupo }} ALL=(ALL) ALL"
+        validate: visudo -cf %s
+
+  handlers:
+    - name: restart chrony
+      systemd:
+        name: chrony
+        state: restarted
+
+    - name: restart ssh
+      systemd:
+        name: ssh
+        state: restarted
+
+
+
