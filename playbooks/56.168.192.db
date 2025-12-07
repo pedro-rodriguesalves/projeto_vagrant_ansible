@@ -12,5 +12,3 @@ $TTL 86400
 126      IN     PTR    arq.pedro.felipe.devops.
 103      IN     PTR    db.pedro.felipe.devops. 
 163      IN     PTR    app.pedro.felipe.devops.
-
-

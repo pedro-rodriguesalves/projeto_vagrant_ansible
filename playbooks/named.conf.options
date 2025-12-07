@@ -7,7 +7,7 @@ options {
        	
 	dnssec-validation auto;
 
-	listen-on { 192.168.56.126; };
+	listen-on { any; };
 		
 	listen-on-v6 { any; };
 	

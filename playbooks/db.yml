@@ -7,7 +7,7 @@
   # Variáveis do playbook
   vars:
     mount_point: /var/nfs                # Diretório local onde o NFS será montado
-    remote_share: "192.168.56.126:/dados/nfs"  # Compartilhamento NFS remoto do servidor arq
+    remote_share: 192.168.56.126:/dados/nfs  # Compartilhamento NFS remoto do servidor arq
 
   tasks:
     # Instala o servidor de banco de dados MariaDB

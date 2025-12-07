@@ -6,14 +6,12 @@
 
   # Variáveis do playbook
   vars:
-    nome1: "pedro"
-    nome2: "felipe"
-    grupo: "ifpb"                     # Grupo comum para todos os usuários
+    grupo: ifpb                     # Grupo comum para todos os usuários
     usuarios:
-      - "pedro"
-      - "felipe"                       # Lista de usuários a serem criados
+      - pedro
+      - felipe                       # Lista de usuários a serem criados
     ntp_servers:
-      - "pool.ntp.br"                  # Servidores NTP a serem configurados
+      - pool.ntp.br                  # Servidores NTP a serem configurados
     ssh_banner: "Acesso apenas para pessoas com autorização expressa!!!"  # Banner SSH
 
   tasks: 
@@ -62,11 +60,10 @@
     - name: Criar usuários no grupo ifpb.
       user:
         name: "{{ item }}"
-        group: "{{ grupo }}"
+        groups: "{{ grupo }}"
         append: yes
         shell: /bin/bash
         state: present
-        create_home: yes
       loop: "{{ usuarios }}"
 
     # Cria o diretório .ssh para cada usuário
@@ -75,7 +72,7 @@
         path: "/home/{{ item }}/.ssh"
         state: directory
         owner: "{{ item }}"
-        group: "{{ grupo }}"
+        group: "{{ item }}"
         mode: '0700'
       loop: "{{ usuarios }}"
 
@@ -84,7 +81,7 @@
       openssh_keypair:
         path: "/home/{{ item }}/.ssh/id_rsa"
         owner: "{{ item }}"
-        group: "{{ grupo }}"
+        group: "{{ item }}"
         mode: '0600'
       loop: "{{ usuarios }}"
 
@@ -95,7 +92,7 @@
         dest: "/home/{{ item }}/.ssh/authorized_keys"
         remote_src: yes
         owner: "{{ item }}"
-        group: "{{ grupo }}"
+        group: "{{ item }}"
         mode: '0600'
       loop: "{{ usuarios }}"
 

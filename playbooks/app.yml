@@ -7,7 +7,7 @@
   # Variáveis específicas do playbook
   vars:
     mount_point: /var/nfs                  # Diretório local onde o NFS será montado
-    remote_share: "192.168.56.126:/dados/nfs"  # Caminho do compartilhamento NFS no servidor arq
+    remote_share: 192.168.56.126:/dados/nfs  # Caminho do compartilhamento NFS no servidor arq
 
   tasks:
     # Instala o servidor web Apache2

@@ -6,10 +6,10 @@
 
   # Variáveis específicas do playbook
   vars:
-    nfs_user: nfs-ifpb        # Usuário que será dono do NFS
-    shared_dir: /dados/nfs    # Diretório a ser compartilhado via NFS
-    subnet: "192.168.56.0/24" # Rede que terá acesso ao NFS
-    lv_size: "15g"            # Tamanho do Logical Volume
+    nfs_user: nfs-ifpb         # Usuário que será dono do NFS
+    shared_dir: /dados/nfs     # Diretório a ser compartilhado via NFS
+    subnet: 192.168.56.0/24  # Rede que terá acesso ao NFS
+    lv_size: 15G               # Tamanho do Logical Volume
     mount_point: /dados        # Ponto de montagem do LV
     vg_name: dados             # Nome do Volume Group
     lv_name: ifpb              # Nome do Logical Volume
@@ -30,7 +30,9 @@
         device: "/dev/{{ item }}"
         number: 1
         state: present
-        part_end: "100%"
+        part_type: primary
+        fs_type: ext4
+        resize: yes
       loop:
         - sdb
         - sdc
@@ -38,25 +40,26 @@
 
     # Inicializa cada disco como Physical Volume
     - name: Criar volumes físicos.
-      lvg_pv:                  
-        pv: "/dev/{{ item }}1"
+      command: pvcreate /dev/{{ item }}1
       loop:
         - sdb
         - sdc
         - sdd
+      args:
+        creates: "/dev/{{ item }}1"
 
     # Cria o Volume Group "dados" usando os PVs
     - name: Criar volume group "dados".
-      lvg:                     
-        vg: "{{ vg_name }}"
-        pvs: "/dev/sdb1, /dev/sdc1, /dev/sdd1"
+      command: vgcreate {{ vg_name }} /dev/sdb1 /dev/sdc1 /dev/sdd1
+      args:
+        creates: "/dev/{{ vg_name }}"
+
 
     # Cria um Logical Volume "ifpb" de 15GB dentro do VG
     - name: Criar logical volume "ifpb" de 15GB.
-      lvol:                    
-        vg: "{{ vg_name }}"
-        lv: "{{ lv_name }}"
-        size: "{{ lv_size }}"
+      command: lvcreate -L {{ lv_size }} -n {{ lv_name }} {{ vg_name }}
+      args:
+        creates: "/dev/{{ vg_name }}/{{ lv_name }}"
 
     # Formata o Logical Volume com sistema de arquivos ext4
     - name: Formatar o LV com ext4.
@@ -77,7 +80,7 @@
         src: "/dev/{{ vg_name }}/{{ lv_name }}"
         fstype: ext4
         state: mounted
-        fstab: yes
+        opts: defaults
 
     # Instala o servidor NFS
     - name: Instalar servidor NFS.

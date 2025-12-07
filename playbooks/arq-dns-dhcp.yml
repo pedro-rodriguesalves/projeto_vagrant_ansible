@@ -6,12 +6,12 @@
 
   # Variáveis específicas do playbook
   vars:
-    dominio: "pedro.felipe.devops"  # Domínio interno
-    ip_arq: "192.168.56.126"         # IP do servidor ARQ
-    ip_db: "192.168.56.103"          # IP reservado para DB
-    ip_app: "192.168.56.163"         # IP reservado para APP
-    rede: "192.168.56.0/24"          # Rede interna
-    gateway: "192.168.56.1"          # Gateway da rede
+    dominio: pedro.felipe.devops  # Domínio interno
+    ip_arq: 192.168.56.126         # IP do servidor ARQ
+    ip_db: 192.168.56.103         # IP reservado para DB
+    ip_app: 192.168.56.163         # IP reservado para APP
+    rede: 192.168.56.0/24          # Rede interna
+    gateway: 192.168.56.1          # Gateway da rede
 
   tasks:
     # Instala o servidor DHCP
@@ -66,6 +66,9 @@
       copy:
         src: named.conf.options
         dest: /etc/bind/named.conf.options
+        owner: root
+        group: bind
+        mode: '0644'
       notify: restart bind9  # Reinicia o BIND9 se o arquivo for alterado
 
     # Copia a configuração de zonas internas do BIND
@@ -73,6 +76,9 @@
       copy:
         src: named.conf.internal-zones
         dest: /etc/bind/named.conf.local
+        owner: root
+        group: bind
+        mode: '0644'
       notify: restart bind9
 
     # Copia o arquivo da zona direta para o BIND
@@ -80,6 +86,9 @@
       copy:
         src: pedro.felipe.devops.db
         dest: /etc/bind/pedro.felipe.devops.db
+        owner: root
+        group: bind
+        mode: '0644'
       notify: restart bind9
 
     # Copia o arquivo da zona reversa para o BIND
@@ -87,6 +96,9 @@
       copy:
         src: 56.168.192.db
         dest: /etc/bind/56.168.192.db
+        owner: root
+        group: bind
+        mode: '0644'
       notify: restart bind9
 
     # Habilita e inicia o serviço BIND9

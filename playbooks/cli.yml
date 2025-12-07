@@ -7,7 +7,7 @@
   # Variáveis do playbook
   vars:
     mount_point: /var/nfs                # Diretório local de montagem do NFS
-    remote_share: "192.168.56.126:/dados/nfs"  # Compartilhamento NFS remoto
+    remote_share: 192.168.56.126:/dados/nfs  # Compartilhamento NFS remoto
 
   tasks:
     # Instala pacotes necessários para navegador e X11
