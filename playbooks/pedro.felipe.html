@@ -1,0 +1,74 @@
+<!DOCTYPE html>
+          <html lang="pt-br">
+          <head>
+              <meta charset="UTF-8">
+              <meta name="viewport" content="width=device-width, initial-scale=1.0">
+              <title>Projeto DevOps - {{ Pedro Henrique Rodrigues Alves | capitalize }} e {{ Felipe da Silva Oliveira | capitalize}}</title>
+              <style>
+                  body {
+                      font-family: Arial, sans-serif;
+                      margin: 0;
+                      padding: 20px;
+                      background-color: #f4f4f4;
+                  }
+                  .container {
+                      max-width: 800px;
+                      margin: 0 auto;
+                      background: white;
+                      padding: 30px;
+                      border-radius: 10px;
+                      box-shadow: 0 0 10px rgba(0,0,0,0.1);
+                  }
+                  h1 {
+                      color: #2c3e50;
+                      border-bottom: 2px solid #3498db;
+                      padding-bottom: 10px;
+                  }
+                  .info {
+                      background: #ecf0f1;
+                      padding: 15px;
+                      border-radius: 5px;
+                      margin: 20px 0;
+                  }
+                  .integrantes {
+                      display: grid;
+                      grid-template-columns: 1fr 1fr;
+                      gap: 20px;
+ }
+                  .integrante {
+                      background: #3498db;
+                      color: white;
+                      padding: 15px;
+                      border-radius: 5px;
+                      text-align: center;
+                  }
+              </style>
+          </head>
+          <body>
+              <div class="container">
+                  <h1>🚀 Projeto de Infraestrutura DevOps</h1>
+
+                  <div class="info">
+                      <h2>📋 Descrição do Projeto</h2>
+                      <p>Este projeto consiste na implementação de uma infraestrutura completa utilizando Vagrant e Ansible, com quatro máquinas virtuais interconectadas proporcionando serviços de rede, armazenamento, banco de dados e aplicação web.</p>
+                  </div>
+
+                  <h2>👥 Integrantes da Equipe</h2>
+                  <div class="integrantes">
+                      <div class="integrante">
+                          <h3>{{ Pedro Henrique Rodrigues Alves}}</h3>
+                          <p>Matrícula: {{ 20241380026 }}</p>
+                      </div>
+                      <div class="integrante">
+                          <h3>{{ Felipe da Silva Oliveira }}</h3>
+                          <p>Matrícula: {{ 20241380003 }}</p>
+                      </div>
+                  </div>
+
+                  <div style="margin-top: 30px; text-align: center;">
+                      <p><strong>Tecnologias utilizadas:</strong> Vagrant, Ansible, VirtualBox, Debian, Apache, MariaDB, NFS, DHCP, DNS</p>
+                  </div>
+              </div>
+          </body>
+          </html>
+

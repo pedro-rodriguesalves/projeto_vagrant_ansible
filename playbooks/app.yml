@@ -1,0 +1,82 @@
+---
+# Playbook para configurar o Servidor de Aplicação (app)
+- name: Configurar Servidor de Aplicação (app).
+  hosts: app
+  become: yes  # Elevar privilégios para root
+
+  # Variáveis específicas do playbook
+  vars:
+    mount_point: /var/nfs                  # Diretório local onde o NFS será montado
+    remote_share: "192.168.56.126:/dados/nfs"  # Caminho do compartilhamento NFS no servidor arq
+
+  tasks:
+    # Instala o servidor web Apache2
+    - name: Instalar servidor web apache2.
+      apt:
+        name: apache2
+        update_cache: yes
+        state: present
+
+    # Garante que o serviço Apache está rodando e habilitado no boot
+    - name: Garantir que apache2 está rodando.
+      service:
+        name: apache2
+        state: started
+        enabled: yes
+
+    # Cria e copia o arquivo index.html personalizado para o diretório web
+    - name: Criar arquivo index.html personalizado.
+      copy:
+        src: pedro.felipe.html
+        dest: "/var/www/html/index.html"
+        owner: www-data
+        group: www-data
+        mode: 0644
+      notify: restart apache2  # Reinicia Apache se o arquivo for modificado
+
+    # Instala o autofs e o cliente NFS para montagem automática
+    - name: Instalar autofs e cliente NFS.
+      apt:
+        name: 
+          - autofs
+          - nfs-common
+        state: present
+
+    # Cria o diretório local para montagem do NFS
+    - name: Criar diretório de montagem /var/nfs.
+      file:
+        path: "{{ mount_point }}"
+        state: directory
+        owner: root
+        group: root
+        mode: "0755"
+
+    # Adiciona entrada no auto.master para o ponto de montagem
+    - name: Configurar auto.master para NFS.
+      blockinfile:
+        path: /etc/auto.master
+        block: |
+          {{ mount_point }} /etc/auto.nfs --ghost
+
+    # Cria arquivo auto.nfs com parâmetros de montagem do compartilhamento
+    - name: Configurar arquivo auto.nfs.
+      copy:
+        dest: /etc/auto.nfs
+        content: |
+          share -rw,soft,intr {{ remote_share }}
+      notify: restart autofs  # Reinicia autofs se o arquivo for modificado
+
+  # Handlers para reiniciar serviços quando notificados
+  handlers:
+    # Reinicia o Apache
+    - name: restart apache2
+      systemd:
+        name: apache2
+        state: restarted
+
+    # Reinicia o serviço autofs
+    - name: restart autofs
+      systemd:
+        name: autofs
+        state: restarted
+

@@ -1,0 +1,16 @@
+$TTL 86400   
+@   IN  SOA     arq.pedro.felipe.devops. root.pedro.felipe.devops. (
+        2025082501    ;Serial
+        3600          ;Refresh
+        1800          ;Retry
+        604800        ;Expire
+        86400         ;Minimum TTL
+
+)
+@   	 IN     NS     arq.pedro.felipe.devops.
+
+126      IN     PTR    arq.pedro.felipe.devops.
+103      IN     PTR    db.pedro.felipe.devops. 
+163      IN     PTR    app.pedro.felipe.devops.
+
+

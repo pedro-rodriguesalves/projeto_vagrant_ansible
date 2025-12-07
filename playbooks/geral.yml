@@ -1,107 +1,142 @@
 ---
+# Playbook para configuração geral de todas as máquinas
 - name: Configuração Geral de Todas as Máquinas.
   hosts: all
-  become: yes
+  become: yes  # Elevar privilégios para root
+
+  # Variáveis do playbook
   vars:
     nome1: "pedro"
     nome2: "felipe"
-
-    grupo: "ifpb"
+    grupo: "ifpb"                     # Grupo comum para todos os usuários
     usuarios:
       - "pedro"
-      - "felipe"
-
+      - "felipe"                       # Lista de usuários a serem criados
     ntp_servers:
-      - "pool.ntp.br"
+      - "pool.ntp.br"                  # Servidores NTP a serem configurados
+    ssh_banner: "Acesso apenas para pessoas com autorização expressa!!!"  # Banner SSH
 
-    ssh_banner: "Acesso apenas para pessoas com autorização expressa!!!"
-  
   tasks: 
+    # Atualiza pacotes do sistema operacional e realiza upgrade
     - name: Atualizar o Sistema Operacional.
       apt:
         update_cache: yes
+        upgrade: dist
         cache_valid_time: 3600
 
-    - name: Fazer o Upgrade do Sistema Operacional.
-      apt:
-        upgrade: dist
-        autoremove: yes
-
+    # Instala o serviço de NTP (chrony)
     - name: Instalação do chrony.
       apt:
         name: chrony
         state: present
 
+    # Configura os servidores NTP no chrony
     - name: Configurar o servidor NTP.
-      template:
-        src: templates/chrony.conf.j2
-        dest: /etc/chrony/chrony.conf
-      notify: restart chrony
+      lineinfile:
+        path: /etc/chrony/chrony.conf
+        regexp: '^pool '
+        line: 'pool {{ item }} iburst'
+        state: present
+      loop: "{{ ntp_servers }}"
+      notify: restart chrony  # Reinicia o serviço se houver alteração
 
+    # Inicia o serviço chrony e habilita no boot
     - name: Rodar o chrony.
-      systemd:
+      service:
         name: chrony
         state: started
         enabled: yes
-  
 
+    # Define o fuso horário da máquina
     - name: Configurar timezone America/Recife.
       timezone:
         name: America/Recife
 
-    
+    # Cria o grupo "ifpb"
     - name: Criar grupo ifpb.
       group:
         name: "{{ grupo }}"
         state: present
 
-    
+    # Cria os usuários definidos na lista, adicionando-os ao grupo "ifpb"
     - name: Criar usuários no grupo ifpb.
       user:
         name: "{{ item }}"
         group: "{{ grupo }}"
+        append: yes
         shell: /bin/bash
         state: present
         create_home: yes
       loop: "{{ usuarios }}"
 
-    
-    - name: Gerar chaves SSH para os usuários.
-      user:
-        name: "{{ item }}"
-        generate_ssh_key: yes
-        ssh_key_file: .ssh/id_rsa
+    # Cria o diretório .ssh para cada usuário
+    - name: Criar diretório .ssh nos homes
+      file:
+        path: "/home/{{ item }}/.ssh"
+        state: directory
+        owner: "{{ item }}"
+        group: "{{ grupo }}"
+        mode: '0700'
       loop: "{{ usuarios }}"
 
-    
-    - name: Configurar servidor SSH.
-      template:
-        src: templates/sshd_config.j2
-        dest: /etc/ssh/sshd_config
-      notify: restart ssh
+    # Gera chaves SSH para cada usuário
+    - name: Gerar chaves SSH para os usuários.
+      openssh_keypair:
+        path: "/home/{{ item }}/.ssh/id_rsa"
+        owner: "{{ item }}"
+        group: "{{ grupo }}"
+        mode: '0600'
+      loop: "{{ usuarios }}"
 
+    # Copia a chave pública para o authorized_keys
+    - name: Copiar chave pública para authorized_keys
+      copy:
+        src: "/home/{{ item }}/.ssh/id_rsa.pub"
+        dest: "/home/{{ item }}/.ssh/authorized_keys"
+        remote_src: yes
+        owner: "{{ item }}"
+        group: "{{ grupo }}"
+        mode: '0600'
+      loop: "{{ usuarios }}"
+
+    # Cria banner de acesso SSH
     - name: Criar banner do SSH.
       copy:
         content: "{{ ssh_banner }}"
-        dest: /etc/ssh/banner
-        owner: root
-        group: root
-        mode: 0644
+        dest: /etc/issue.net
 
-    
+    # Configura o SSH para usar o banner
+    - name: Apontar SSH para usar banner
+      lineinfile:
+        path: /etc/ssh/sshd_config
+        regexp: '^#?Banner'
+        line: 'Banner /etc/issue.net'
+        
+    # Ajustes de segurança do SSH: bloqueia root, permite só autenticação por chave e grupos autorizados
+    - name: Configurar SSH - bloquear root, chaves apenas, grupos permitidos
+      blockinfile:
+        path: /etc/ssh/sshd_config
+        block: |
+          PermitRootLogin no
+          PasswordAuthentication no
+          AllowGroups vagrant ifpb
+      notify: restart ssh
+
+    # Instala cliente NFS
     - name: Instalar cliente NFS.
       apt:
         name: nfs-common
         state: present
 
-    
+    # Permite que o grupo ifpb use sudo
     - name: Permitir grupo ifpb usar sudo.
       lineinfile:
         path: /etc/sudoers
-        state: present
-        line: "%{{ grupo }} ALL=(ALL) ALL"
-        validate: visudo -cf %s
+        regexp: '^%{{ grupo }}'
+        line: '%{{ grupo }} ALL=(ALL:ALL) ALL'
+        validate: '/usr/sbin/visudo -cf %s'
 
+  # Handlers para reiniciar serviços quando necessário
   handlers:
     - name: restart chrony
       systemd:
@@ -112,6 +147,4 @@
       systemd:
         name: ssh
         state: restarted
-
-
 

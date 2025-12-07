@@ -1,0 +1,145 @@
+---
+# Playbook para configurar LVM e NFS no Servidor ARQ
+- name: Configurar LVM e NFS no Servidor ARQ
+  hosts: arq
+  become: yes  # Elevar privilégios para root
+
+  # Variáveis específicas do playbook
+  vars:
+    nfs_user: nfs-ifpb        # Usuário que será dono do NFS
+    shared_dir: /dados/nfs    # Diretório a ser compartilhado via NFS
+    subnet: "192.168.56.0/24" # Rede que terá acesso ao NFS
+    lv_size: "15g"            # Tamanho do Logical Volume
+    mount_point: /dados        # Ponto de montagem do LV
+    vg_name: dados             # Nome do Volume Group
+    lv_name: ifpb              # Nome do Logical Volume
+
+  tasks:
+    # Instala os pacotes LVM2 e parted
+    - name: Instalar LVM2.
+      apt:
+        name: 
+          - lvm2
+          - parted
+        update_cache: yes
+        state: present
+
+    # Cria partições físicas em cada disco adicional
+    - name: Criar partições físicas nos discos.
+      parted:
+        device: "/dev/{{ item }}"
+        number: 1
+        state: present
+        part_end: "100%"
+      loop:
+        - sdb
+        - sdc
+        - sdd
+
+    # Inicializa cada disco como Physical Volume
+    - name: Criar volumes físicos.
+      lvg_pv:                  
+        pv: "/dev/{{ item }}1"
+      loop:
+        - sdb
+        - sdc
+        - sdd
+
+    # Cria o Volume Group "dados" usando os PVs
+    - name: Criar volume group "dados".
+      lvg:                     
+        vg: "{{ vg_name }}"
+        pvs: "/dev/sdb1, /dev/sdc1, /dev/sdd1"
+
+    # Cria um Logical Volume "ifpb" de 15GB dentro do VG
+    - name: Criar logical volume "ifpb" de 15GB.
+      lvol:                    
+        vg: "{{ vg_name }}"
+        lv: "{{ lv_name }}"
+        size: "{{ lv_size }}"
+
+    # Formata o Logical Volume com sistema de arquivos ext4
+    - name: Formatar o LV com ext4.
+      filesystem:
+        fstype: ext4
+        dev: "/dev/{{ vg_name }}/{{ lv_name }}"
+
+    # Cria o diretório de montagem /dados
+    - name: Criar diretório /dados.
+      file:
+        path: "{{ mount_point }}"
+        state: directory
+
+    # Configura o LV para montagem automática no /dados via fstab
+    - name: Configurar montagem automática no /dados.
+      mount:
+        path: "{{ mount_point }}"
+        src: "/dev/{{ vg_name }}/{{ lv_name }}"
+        fstype: ext4
+        state: mounted
+        fstab: yes
+
+    # Instala o servidor NFS
+    - name: Instalar servidor NFS.
+      apt:
+        name: nfs-kernel-server
+        update_cache: yes
+        state: present
+
+    # Cria o usuário nfs-ifpb sem shell (somente para mapeamento)
+    - name: Criar usuário nfs-ifpb sem shell.
+      user:
+        name: "{{ nfs_user }}"
+        shell: /usr/sbin/nologin
+        system: yes
+        state: present
+
+    # Cria o diretório compartilhado e define permissões
+    - name: Criar diretório compartilhado.
+      file:
+        path: "{{ shared_dir }}"
+        state: directory
+        owner: "{{ nfs_user }}"
+        group: "{{ nfs_user }}"
+        mode: '0750'
+
+    # Obtém o UID do usuário nfs-ifpb
+    - name: Obter UID do usuário nfs-ifpb
+      command: id -u {{ nfs_user }}
+      register: uid
+      changed_when: false
+
+    # Obtém o GID do grupo nfs-ifpb
+    - name: Obter GID do grupo nfs-ifpb
+      command: id -g {{ nfs_user }}
+      register: gid
+      changed_when: false
+
+    # Armazena UID e GID em variáveis para configurar exportações NFS
+    - name: Armazenar UID e GID em variáveis
+      set_fact:
+        nfs_uid: "{{ uid.stdout }}"
+        nfs_gid: "{{ gid.stdout }}"
+
+    # Configura a exportação NFS no arquivo /etc/exports
+    - name: Configurar exportação NFS.
+      copy:
+        dest: /etc/exports
+        content: |
+          {{ shared_dir }} {{ subnet }}(rw,sync,no_subtree_check,all_squash,anonuid={{ nfs_uid }},anongid={{ nfs_gid }})
+      notify: restart nfs-kernel-server  # Reinicia o serviço NFS se o arquivo for alterado
+
+    # Habilita e inicia o servidor NFS
+    - name: Habilitar e iniciar servidor NFS.
+      systemd:
+        name: nfs-kernel-server
+        state: started
+        enabled: yes
+
+  # Handler para reiniciar o serviço NFS quando necessário
+  handlers:
+    - name: restart nfs-kernel-server
+      systemd:
+        name: nfs-kernel-server
+        state: restarted
+

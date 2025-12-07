@@ -1,0 +1,73 @@
+---
+# Playbook para configurar o Servidor de Banco de Dados (db)
+- name: Configurar Servidor de Banco de Dados (db).
+  hosts: db
+  become: yes  # Elevar privilégios para root
+
+  # Variáveis do playbook
+  vars:
+    mount_point: /var/nfs                # Diretório local onde o NFS será montado
+    remote_share: "192.168.56.126:/dados/nfs"  # Compartilhamento NFS remoto do servidor arq
+
+  tasks:
+    # Instala o servidor de banco de dados MariaDB
+    - name: Instalar servidor de banco de dados mariadb-server.
+      apt:
+        name: mariadb-server
+        update_cache: yes 
+        state: present
+
+    # Garante que o serviço MariaDB está ativo e habilitado para iniciar junto ao sistema
+    - name: Garantir que mariadb está rodando.
+      systemd:
+        name: mariadb
+        state: started
+        enabled: yes
+
+    # Instala o autofs e o cliente NFS para montagem automática de diretórios remotos
+    - name: Instalar autofs.
+      apt:
+        name: 
+          - autofs       # Serviço de montagem automática
+          - nfs-common   # Cliente NFS
+        update_cache: yes
+        state: present
+
+    # Cria o diretório local de montagem do NFS
+    - name: Criar diretório de montagem local.
+      file:
+        path: "{{ mount_point }}"
+        state: directory
+        owner: root
+        group: root
+        mode: "0755"
+
+    # Configura o auto.master para incluir o ponto de montagem NFS
+    - name: Configurar o autofs para montagem automática do NFS.
+      blockinfile:
+        path: /etc/auto.master
+        block: |
+          {{ mount_point }} /etc/auto.nfs --ghost
+
+    # Cria o arquivo auto.nfs com parâmetros do compartilhamento remoto
+    - name: Criar configuração do ponto de montagem NFS.
+      copy:
+        dest: /etc/auto.nfs
+        content: |
+          share -rw,sync,hard,intr {{ remote_share }}
+      notify: restart autofs  # Notifica handler para reiniciar autofs quando o arquivo é alterado
+
+    # Garante que o serviço autofs está ativo e habilitado para iniciar junto ao sistema
+    - name: Garantir que autofs está rodando.
+      systemd:
+        name: autofs
+        state: started
+        enabled: yes
+
+  # Handlers para reiniciar serviços quando necessário
+  handlers:
+    - name: restart autofs
+      systemd:
+        name: autofs
+        state: restarted
+

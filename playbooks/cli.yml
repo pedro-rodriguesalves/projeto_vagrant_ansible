@@ -1,0 +1,99 @@
+---
+# Playbook para configurar o Host Cliente (cli)
+- name: Configurar Host Cliente (cli).
+  hosts: cli
+  become: yes  # Elevar privilégios para root
+
+  # Variáveis do playbook
+  vars:
+    mount_point: /var/nfs                # Diretório local de montagem do NFS
+    remote_share: "192.168.56.126:/dados/nfs"  # Compartilhamento NFS remoto
+
+  tasks:
+    # Instala pacotes necessários para navegador e X11
+    - name: Instalar firefox-esr e xauth.
+      apt:
+        name:
+          - firefox-esr   # Navegador
+          - xauth         # Autenticação X11
+          - x11-utils     # Utilitários X11
+        state: present
+        update_cache: yes
+
+    # Ajusta configuração SSH para permitir encaminhamento X11
+    - name: Ajustar SSH para permitir exportação X11.
+      lineinfile:
+        path: /etc/ssh/sshd_config
+        regexp: '^#?X11Forwarding'
+        line: 'X11Forwarding yes'
+        state: present
+      notify: restart ssh  # Notifica handler para reiniciar SSH
+
+    # Define deslocamento de display X11
+    - name: Garantir configuração X11DisplayOffset.
+      lineinfile:
+        path: /etc/ssh/sshd_config
+        regexp: '^X11DisplayOffset'
+        line: 'X11DisplayOffset 10'
+        state: present
+      notify: restart ssh
+
+    # Define que o X11 não usará localhost
+    - name: Garantir configuração X11UseLocalhost.
+      lineinfile:
+        path: /etc/ssh/sshd_config
+        regexp: '^X11UseLocalhost'
+        line: 'X11UseLocalhost no'
+        state: present
+      notify: restart ssh
+
+    # Instala serviço autofs e cliente NFS
+    - name: Instalar autofs e cliente NFS.
+      apt:
+        name: 
+          - autofs       # Montagem automática
+          - nfs-common   # Cliente NFS
+        state: present
+
+    # Cria diretório de montagem local
+    - name: Criar diretório de montagem /var/nfs.
+      file:
+        path: "{{ mount_point }}"
+        state: directory
+        owner: root
+        group: root
+        mode: "0755"
+
+    # Configura auto.master para mapear o diretório NFS
+    - name: Configurar auto.master para NFS.
+      blockinfile:
+        path: /etc/auto.master
+        block: |
+          {{ mount_point }} /etc/auto.nfs --ghost
+
+    # Configura o arquivo auto.nfs com parâmetros do compartilhamento
+    - name: Configurar arquivo auto.nfs.
+      copy:
+        dest: /etc/auto.nfs
+        content: |
+          share -rw,sync,hard,intr {{ remote_share }}
+
+    # Reinicia autofs para aplicar novas configurações
+    - name: Reiniciar autofs para aplicar configurações.
+      systemd:
+        name: autofs
+        state: started
+        enabled: yes
+
+  # Handlers para reiniciar serviços quando necessário
+  handlers:
+    - name: restart ssh
+      systemd:
+        name: ssh
+        state: restarted
+
+    - name: restart autofs
+      systemd:
+        name: autofs
+        state: restarted
+

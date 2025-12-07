@@ -1,0 +1,113 @@
+---
+# Playbook para configurar DNS e DHCP no Servidor ARQ
+- name: Configurar DNS e DHCP no Servidor ARQ.
+  hosts: arq
+  become: yes  # Elevar privilégios para root
+
+  # Variáveis específicas do playbook
+  vars:
+    dominio: "pedro.felipe.devops"  # Domínio interno
+    ip_arq: "192.168.56.126"         # IP do servidor ARQ
+    ip_db: "192.168.56.103"          # IP reservado para DB
+    ip_app: "192.168.56.163"         # IP reservado para APP
+    rede: "192.168.56.0/24"          # Rede interna
+    gateway: "192.168.56.1"          # Gateway da rede
+
+  tasks:
+    # Instala o servidor DHCP
+    - name: Instalar servidor DHCP.
+      apt:
+        name: isc-dhcp-server
+        update_cache: yes
+        state: present
+
+    # Copia a configuração do DHCP para o servidor
+    - name: Copiar configuração do DHCP.
+      copy:
+        src: dhcpd.conf
+        dest: /etc/dhcp/dhcpd.conf
+      notify: restart isc-dhcp-server  # Reinicia o DHCP se o arquivo for alterado
+
+    # Configura a interface de rede que o DHCP irá gerenciar
+    - name: Configurar interface para DHCP.
+      lineinfile:
+        path: /etc/default/isc-dhcp-server
+        regexp: '^INTERFACESv4='
+        line: 'INTERFACESv4="eth1"'
+        state: present
+
+    # Obtém o UID do usuário root (não altera nada)
+    - name: Obter UID do usuário root
+      command: id -u root
+      register: root_uid
+      changed_when: false
+
+    # Obtém o GID do grupo root (não altera nada)
+    - name: Obter GID do grupo root
+      command: id -g root
+      register: root_gid
+      changed_when: false
+
+    # Habilita e inicia o serviço DHCP
+    - name: Habilitar e iniciar servidor DHCP.
+      systemd:
+        name: isc-dhcp-server
+        state: started
+        enabled: yes
+
+    # Instala o servidor DNS BIND9
+    - name: Instalar servidor DNS BIND9.
+      apt:
+        name: bind9
+        state: present
+
+    # Copia o arquivo de opções do BIND
+    - name: Copiar opções do BIND.
+      copy:
+        src: named.conf.options
+        dest: /etc/bind/named.conf.options
+      notify: restart bind9  # Reinicia o BIND9 se o arquivo for alterado
+
+    # Copia a configuração de zonas internas do BIND
+    - name: Copiar configuração de zonas.
+      copy:
+        src: named.conf.internal-zones
+        dest: /etc/bind/named.conf.local
+      notify: restart bind9
+
+    # Copia o arquivo da zona direta para o BIND
+    - name: Copiar zona direta.
+      copy:
+        src: pedro.felipe.devops.db
+        dest: /etc/bind/pedro.felipe.devops.db
+      notify: restart bind9
+
+    # Copia o arquivo da zona reversa para o BIND
+    - name: Copiar zona reversa.
+      copy:
+        src: 56.168.192.db
+        dest: /etc/bind/56.168.192.db
+      notify: restart bind9
+
+    # Habilita e inicia o serviço BIND9
+    - name: Habilitar e iniciar servidor DNS.
+      systemd:
+        name: bind9
+        state: started
+        enabled: yes
+
+  # Handlers para reiniciar serviços quando notificados
+  handlers:
+    # Reinicia o serviço DHCP
+    - name: restart isc-dhcp-server
+      systemd:
+        name: isc-dhcp-server
+        state: restarted
+        
+
+    # Reinicia o serviço BIND9
+    - name: restart bind9
+      systemd:
+        name: bind9
+        state: restarted
+
