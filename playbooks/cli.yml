@@ -1,35 +1,37 @@
 ---
-# Playbook para configurar o Host Cliente (cli)
+# Playbook para configurar o Host Cliente (cli).
 - name: Configurar Host Cliente (cli).
   hosts: cli
-  become: yes  # Elevar privilégios para root
+  become: yes  # Elevar privilégios para root.
 
-  # Variáveis do playbook
+  # Variáveis do playbook:
   vars:
-    mount_point: /var/nfs                # Diretório local de montagem do NFS
-    remote_share: 192.168.56.126:/dados/nfs  # Compartilhamento NFS remoto
-
+    mount_point: /var/nfs                    # Diretório local de montagem do NFS.
+    remote_share: 192.168.56.126:/dados/nfs  # Compartilhamento NFS remoto.
+    usuarios:
+      - pedro
+      - felipe
   tasks:
-    # Instala pacotes necessários para navegador e X11
+    # Instala pacotes necessários para navegador e X11.
     - name: Instalar firefox-esr e xauth.
       apt:
         name:
-          - firefox-esr   # Navegador
-          - xauth         # Autenticação X11
-          - x11-utils     # Utilitários X11
+          - firefox-esr   # Navegador.
+          - xauth         # Autenticação X11.
+          - x11-utils     # Utilitários X11.
         state: present
         update_cache: yes
 
-    # Ajusta configuração SSH para permitir encaminhamento X11
+    # Ajusta configuração SSH para permitir encaminhamento X11.
     - name: Ajustar SSH para permitir exportação X11.
       lineinfile:
         path: /etc/ssh/sshd_config
         regexp: '^#?X11Forwarding'
         line: 'X11Forwarding yes'
         state: present
-      notify: restart ssh  # Notifica handler para reiniciar SSH
+      notify: restart ssh  # Notifica handler para reiniciar SSH.
 
-    # Define deslocamento de display X11
+    # Define deslocamento de display X11.
     - name: Garantir configuração X11DisplayOffset.
       lineinfile:
         path: /etc/ssh/sshd_config
@@ -38,7 +40,7 @@
         state: present
       notify: restart ssh
 
-    # Define que o X11 não usará localhost
+    # Define que o X11 não usará localhost.
     - name: Garantir configuração X11UseLocalhost.
       lineinfile:
         path: /etc/ssh/sshd_config
@@ -47,15 +49,15 @@
         state: present
       notify: restart ssh
 
-    # Instala serviço autofs e cliente NFS
+    # Instala serviço autofs e cliente NFS.
     - name: Instalar autofs e cliente NFS.
       apt:
         name: 
-          - autofs       # Montagem automática
-          - nfs-common   # Cliente NFS
+          - autofs       # Montagem automática.
+          - nfs-common   # Cliente NFS.
         state: present
 
-    # Cria diretório de montagem local
+    # Cria diretório de montagem local.
     - name: Criar diretório de montagem /var/nfs.
       file:
         path: "{{ mount_point }}"
@@ -64,28 +66,60 @@
         group: root
         mode: "0755"
 
-    # Configura auto.master para mapear o diretório NFS
+    # Configura auto.master para mapear o diretório NFS.
     - name: Configurar auto.master para NFS.
       blockinfile:
         path: /etc/auto.master
         block: |
           {{ mount_point }} /etc/auto.nfs --ghost
 
-    # Configura o arquivo auto.nfs com parâmetros do compartilhamento
+    # Configura o arquivo auto.nfs com parâmetros do compartilhamento.
     - name: Configurar arquivo auto.nfs.
       copy:
         dest: /etc/auto.nfs
         content: |
-          share -rw,sync,hard,intr {{ remote_share }}
+          - -rw,sync,hard,intr {{ remote_share }}
 
-    # Reinicia autofs para aplicar novas configurações
+    # Reinicia autofs para aplicar novas configurações.
     - name: Reiniciar autofs para aplicar configurações.
       systemd:
         name: autofs
         state: started
         enabled: yes
 
-  # Handlers para reiniciar serviços quando necessário
+
+    # Criar diretório keys para armazenar as chaves na Máquina Real.
+    - name: Criar diretório local para armazenar chaves deste host
+      delegate_to: localhost
+      run_once: false
+      file:
+        path: "../keys/{{ inventory_hostname }}"
+        state: directory
+        mode: '0700'
+      become: no
+
+
+    # Copiar as chaves privadas para o diretório keys.
+    - name: Buscar chave privada dos usuários deste host para a máquina real
+      fetch:
+        src: "/home/{{ item }}/.ssh/id_rsa"
+        dest: "../keys/{{ inventory_hostname }}/{{ item }}_id_rsa"
+        flat: yes
+        mode: '0600'
+      loop: "{{ usuarios }}"
+      become: yes
+
+    # Atribuir permissão para a utilização das chaves privadas.
+    - name: Garantir permissão 600 nas chaves privadas baixadas
+      delegate_to: localhost
+      become: no
+      command: chmod 600 "../keys/{{ inventory_hostname }}/{{ item }}_id_rsa"
+      loop: "{{ usuarios }}"
+      ignore_errors: no
+
+
+
+  # Handlers para reiniciar serviços quando necessário:
   handlers:
     - name: restart ssh
       systemd:

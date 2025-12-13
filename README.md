@@ -2,9 +2,9 @@
 
 **AUTORIDADES MÁXIMAS:** Pedro Henrique Rodrigues Alves - (20241380026) e Felipe da Silva Oliveira - (20241380003).
 
-**DISCIPLINA:** Administração de Sistemas Abertos
+**DISCIPLINA:** Administração de Sistemas Abertos.
 
-**PROFESSOR, ORIENTADOR E AUTORIDADE MÁXIMA:** Leonidas Francisco de Lima Júnior
+**PROFESSOR, ORIENTADOR E AUTORIDADE MÁXIMA:** Leonidas Francisco de Lima Júnior.
 
 ## Introdução
 
@@ -97,7 +97,6 @@ Os playbooks foram organizados de acordo com as responsabilidades de cada máqui
   - Configuração de forwarders (8.8.8.8 e 1.1.1.1).
   - Ativação do DNSSEC-validation automático.
   - Configuração de listen-on (IPv4).
-  - Desativação do listen-on-v6.
 
 - **`named.conf.internal-zones`**  
   Configura DNS na VM `arq`: 
@@ -173,7 +172,6 @@ Os playbooks foram organizados de acordo com as responsabilidades de cada máqui
    git clone https://github.com/pedro-rodriguesalves/projeto_vagrant_ansible.git
    CD projeto_vagrant_ansible
    
-2. Suba as VMs na ordem correta:
+2. **Suba as VMs:**
    ```bash
-   vagrant up arq
-   vagrant up db app cli
+   vagrant up 

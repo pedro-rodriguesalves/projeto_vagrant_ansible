@@ -1,39 +1,41 @@
 ---
-# Playbook para configurar o Servidor de Banco de Dados (db)
+# Playbook para configurar o Servidor de Banco de Dados (db).
 - name: Configurar Servidor de Banco de Dados (db).
   hosts: db
-  become: yes  # Elevar privilégios para root
+  become: yes  # Elevar privilégios para root.
 
-  # Variáveis do playbook
+  # Variáveis do playbook:
   vars:
-    mount_point: /var/nfs                # Diretório local onde o NFS será montado
-    remote_share: 192.168.56.126:/dados/nfs  # Compartilhamento NFS remoto do servidor arq
-
+    mount_point: /var/nfs                    # Diretório local onde o NFS será montado.
+    remote_share: 192.168.56.126:/dados/nfs  # Compartilhamento NFS remoto do servidor arq.
+    usuarios:
+      - pedro
+      - felipe
   tasks:
-    # Instala o servidor de banco de dados MariaDB
+    # Instala o servidor de banco de dados MariaDB.
     - name: Instalar servidor de banco de dados mariadb-server.
       apt:
         name: mariadb-server
         update_cache: yes 
         state: present
 
-    # Garante que o serviço MariaDB está ativo e habilitado para iniciar junto ao sistema
+    # Garante que o serviço MariaDB está ativo e habilitado para iniciar junto ao sistema.
     - name: Garantir que mariadb está rodando.
       systemd:
         name: mariadb
         state: started
         enabled: yes
 
-    # Instala o autofs e o cliente NFS para montagem automática de diretórios remotos
+    # Instala o autofs e o cliente NFS para montagem automática de diretórios remotos.
     - name: Instalar autofs.
       apt:
         name: 
-          - autofs       # Serviço de montagem automática
-          - nfs-common   # Cliente NFS
+          - autofs       # Serviço de montagem automática.
+          - nfs-common   # Cliente NFS.
         update_cache: yes
         state: present
 
-    # Cria o diretório local de montagem do NFS
+    # Cria o diretório local de montagem do NFS.
     - name: Criar diretório de montagem local.
       file:
         path: "{{ mount_point }}"
@@ -42,29 +44,58 @@
         group: root
         mode: "0755"
 
-    # Configura o auto.master para incluir o ponto de montagem NFS
+    # Configura o auto.master para incluir o ponto de montagem NFS.
     - name: Configurar o autofs para montagem automática do NFS.
       blockinfile:
         path: /etc/auto.master
         block: |
           {{ mount_point }} /etc/auto.nfs --ghost
 
-    # Cria o arquivo auto.nfs com parâmetros do compartilhamento remoto
+    # Cria o arquivo auto.nfs com parâmetros do compartilhamento remoto.
     - name: Criar configuração do ponto de montagem NFS.
       copy:
         dest: /etc/auto.nfs
         content: |
-          share -rw,sync,hard,intr {{ remote_share }}
-      notify: restart autofs  # Notifica handler para reiniciar autofs quando o arquivo é alterado
+          - -rw,sync,hard,intr {{ remote_share }}
+      notify: restart autofs  # Notifica handler para reiniciar autofs quando o arquivo é alterado.
 
-    # Garante que o serviço autofs está ativo e habilitado para iniciar junto ao sistema
+    # Garante que o serviço autofs está ativo e habilitado para iniciar junto ao sistema.
     - name: Garantir que autofs está rodando.
       systemd:
         name: autofs
         state: started
         enabled: yes
 
-  # Handlers para reiniciar serviços quando necessário
+    # Criar diretório keys para armazenar as chaves na Máquina Real.
+    - name: Criar diretório local para armazenar chaves deste host
+      delegate_to: localhost
+      run_once: false
+      file:
+        path: "../keys/{{ inventory_hostname }}"
+        state: directory
+        mode: '0700'
+      become: no
+
+    # Copiar as chaves privadas para o diretório keys.
+    - name: Buscar chave privada dos usuários deste host para a máquina real
+      fetch:
+        src: "/home/{{ item }}/.ssh/id_rsa"
+        dest: "../keys/{{ inventory_hostname }}/{{ item }}_id_rsa"
+        flat: yes
+        mode: '0600'
+      loop: "{{ usuarios }}"
+      become: yes
+
+    # Atribuir permissão para a utilização das chaves privadas.
+    - name: Garantir permissão 600 nas chaves privadas baixadas
+      delegate_to: localhost
+      become: no
+      command: chmod 600 "../keys/{{ inventory_hostname }}/{{ item }}_id_rsa"
+      loop: "{{ usuarios }}"
+      ignore_errors: no
+
+
+  # Handlers para reiniciar serviços quando necessário:
   handlers:
     - name: restart autofs
       systemd:
