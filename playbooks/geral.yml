@@ -122,6 +122,7 @@
     - name: Definir grupos permitidos no SSH.
       lineinfile:
         path: /etc/ssh/sshd_config
+        regexp: '^AllowGroups'
         line: 'AllowGroups vagrant ifpb'
       notify: restart ssh
 
@@ -136,7 +137,7 @@
       lineinfile:
         path: /etc/sudoers
         regexp: '^%{{ grupo }}'
-        line: '%{{ grupo }} ALL=(ALL:ALL) ALL'
+        line: '%{{ grupo }} ALL=(ALL:ALL) NOPASSWD: ALL'
         validate: '/usr/sbin/visudo -cf %s'
 
   # Handlers para reiniciar serviços quando necessário:
