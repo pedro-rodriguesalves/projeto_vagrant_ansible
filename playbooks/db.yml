@@ -56,7 +56,7 @@
       copy:
         dest: /etc/auto.nfs
         content: |
-          - -rw,sync,hard,intr {{ remote_share }}
+          dados -fstype=nfs,rw,sync,hard,intr {{ remote_share }}
       notify: restart autofs  # Notifica handler para reiniciar autofs quando o arquivo é alterado.
 
     # Garante que o serviço autofs está ativo e habilitado para iniciar junto ao sistema.

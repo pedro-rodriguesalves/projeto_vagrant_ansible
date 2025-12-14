@@ -78,15 +78,8 @@
       copy:
         dest: /etc/auto.nfs
         content: |
-          - -rw,sync,hard,intr {{ remote_share }}
-
-    # Reinicia autofs para aplicar novas configurações.
-    - name: Reiniciar autofs para aplicar configurações.
-      systemd:
-        name: autofs
-        state: started
-        enabled: yes
-
+          dados -fstype=nfs,rw,sync,hard,intr {{ remote_share }}
+      notify: restart autofs
 
     # Criar diretório keys para armazenar as chaves na Máquina Real.
     - name: Criar diretório local para armazenar chaves deste host
